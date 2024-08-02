@@ -2,6 +2,7 @@ use core::panic;
 use std::collections::HashMap;
 
 #[derive(Debug)]
+#[derive(PartialEq)]
 pub enum DecodedElement {
     Integer(isize),
     String(String),
@@ -25,7 +26,7 @@ pub fn decode_int(encoded_value: &str) -> (DecodedElement, usize) {
     let number = &encoded_value[1..end_marker];
     let number: isize = number.parse().expect("The string received is not an integer");
 
-    (DecodedElement::Integer(number), end_marker+2)
+    (DecodedElement::Integer(number), end_marker+1)
 }
 
 // TODO: throw error when the string size doesn't match the actual size of the string.
@@ -36,7 +37,6 @@ pub fn decode_string(encoded_value: &str) -> (DecodedElement, usize) {
         .collect();
 
     let start_marker = size.len();
-    println!("{}", size);
     let size: usize = size.parse().expect("Invalid string length");
 
     let decoded_string = encoded_value
