@@ -31,7 +31,7 @@ impl ConsoleParser {
     pub fn process_command(&self) {
         match self.command {
             ConsoleCommand::Decode => {
-                let (decoded, _size) = bencoding::decode(&self.value);
+                let decoded = bencoding::decode(&self.value);
 
                 match decoded {
                     DecodedElement::String(value) => println!("{}", value),

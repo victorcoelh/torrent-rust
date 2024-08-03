@@ -1,5 +1,6 @@
-use core::panic;
+use core::str::Chars;
 use std::collections::HashMap;
+use std::iter::Peekable;
 
 #[derive(Debug)]
 #[derive(PartialEq)]
@@ -11,55 +12,52 @@ pub enum DecodedElement {
 }
 
 // TODO: refactor everything to use iterators
-pub fn decode(encoded: &str) -> (DecodedElement, usize) {
-    match encoded.chars().next().expect("should never panic") {
-        'i' => decode_int(encoded),
-        'l' => decode_list(encoded),
-        'd' => panic!("Not Implemented"),
-        _ => decode_string(encoded),
+pub fn decode(encoded: &str) -> DecodedElement {
+    let mut iterable = encoded.chars().peekable();
+    
+    match iterable.peek().expect("should never panic") {
+        'l' => decode_list(iterable),
+        'd' => DecodedElement::Integer(5),
+        _ => decode_from_iter(&mut iterable)
     }
 }
 
-pub fn decode_int(encoded_value: &str) -> (DecodedElement, usize) {
-    let end_marker = encoded_value.find("e").expect("Missing int 'e' marker");
+pub fn decode_from_iter(iterator: &mut Peekable<Chars>) -> DecodedElement {
+    match iterator.peek().expect("Should never panic") {
+        'i' => decode_int(iterator),
+        _ => decode_string(iterator),
+    }
+}
 
-    let number = &encoded_value[1..end_marker];
-    let number: isize = number.parse().expect("The string received is not an integer");
+pub fn decode_int(encoded: &mut Peekable<Chars>) -> DecodedElement {
+    let number: String = encoded.skip(1)
+        .take_while(|c| c.is_digit(10))
+        .collect();
 
-    (DecodedElement::Integer(number), end_marker+1)
+    let number: isize = number.parse().expect("Invalid integer inserted");
+    DecodedElement::Integer(number)
 }
 
 // TODO: throw error when the string size doesn't match the actual size of the string.
-pub fn decode_string(encoded_value: &str) -> (DecodedElement, usize) {
-    let size: String = encoded_value
-        .chars()
-        .take_while(|char| *char != ':')
+pub fn decode_string(encoded: &mut Peekable<Chars>) -> DecodedElement {
+    let size: String = encoded
+        .take_while(|char| char.is_digit(10))
         .collect();
+    
+    let size: usize = size.parse().expect("Invalid string size");
+    let string: String = encoded.take(size).collect();
 
-    let start_marker = size.len();
-    let size: usize = size.parse().expect("Invalid string length");
-
-    let decoded_string = encoded_value
-        .chars()
-        .skip(start_marker+1)
-        .take(size)
-        .collect();
-
-    (DecodedElement::String(decoded_string), size+2)
+    DecodedElement::String(string)
 }
 
 // TODO: Improve error handling
-pub fn decode_list(encoded_value: &str) -> (DecodedElement, usize) {
-    let encoded_string = encoded_value.to_string();
+pub fn decode_list(mut encoded: Peekable<Chars>) -> DecodedElement {
     let mut decoded_list: Vec<DecodedElement> = Vec::new();
-    let mut total_size = 1;
+    encoded.next().expect("should not panic");
 
-    while encoded_string.chars().skip(total_size).next().unwrap() != 'e' {
-        let (element, skip) = decode(&encoded_string[total_size..]);
+    while *encoded.peek().expect("List missing an end marker") != 'e' {
+        let element = decode_from_iter(&mut encoded);
         decoded_list.push(element);
-
-        total_size += skip;
     };
-
-    (DecodedElement::List(decoded_list), total_size)
+    DecodedElement::List(decoded_list)
 }
