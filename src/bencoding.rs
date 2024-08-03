@@ -17,7 +17,7 @@ pub fn decode(encoded: &str) -> DecodedElement {
     
     match iterable.peek().expect("should never panic") {
         'l' => decode_list(iterable),
-        'd' => DecodedElement::Integer(5),
+        'd' => decode_dictionary(iterable),
         _ => decode_from_iter(&mut iterable)
     }
 }
@@ -60,4 +60,24 @@ pub fn decode_list(mut encoded: Peekable<Chars>) -> DecodedElement {
         decoded_list.push(element);
     };
     DecodedElement::List(decoded_list)
+}
+
+pub fn decode_dictionary(mut encoded: Peekable<Chars>) -> DecodedElement {
+    let mut decoded_dict: HashMap<String, String> = HashMap::new();
+    encoded.next().expect("should not panic");
+
+    while *encoded.peek().expect("List missing an end marker") != 'e' {
+        let key = get_dict_item(decode_from_iter(&mut encoded));
+        let value = get_dict_item(decode_from_iter(&mut encoded));
+
+        decoded_dict.insert(key, value);
+    }
+    DecodedElement::Dictionary(decoded_dict)
+}
+
+fn get_dict_item(element: DecodedElement) -> String {
+    match element {
+        DecodedElement::String(value) => value,
+        _ => panic!("Invalid dict item: Dictionary should only contain strings."),
+    }
 }

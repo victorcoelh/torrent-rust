@@ -1,4 +1,5 @@
 use core::panic;
+use std::collections::HashMap;
 
 use torrent_rust::bencoding;
 
@@ -46,5 +47,15 @@ fn test_decode_list() {
 
 #[test]
 fn test_decode_dictionary() {
-    assert!(true);
+    let input = "d3:cow3:moo4:spam4:eggse";
+
+    let mut expected: HashMap<String, String> = HashMap::new();
+    expected.insert("cow".to_string(), "moo".to_string());
+    expected.insert("spam".to_string(), "eggs".to_string());
+
+    let result = bencoding::decode(input);
+    match result {
+        bencoding::DecodedElement::Dictionary(value) => assert_eq!(expected, value),
+        _ => panic!("Wrong type returned"),
+    }
 }
