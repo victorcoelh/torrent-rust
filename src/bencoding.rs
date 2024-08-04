@@ -8,24 +8,17 @@ pub enum DecodedElement {
     Integer(isize),
     String(String),
     List(Vec<DecodedElement>),
-    Dictionary(HashMap<String, String>)
+    Dictionary(HashMap<String, DecodedElement>)
 }
 
-// TODO: refactor everything to use iterators
 pub fn decode(encoded: &str) -> DecodedElement {
     let mut iterable = encoded.chars().peekable();
     
     match iterable.peek().expect("should never panic") {
-        'l' => decode_list(iterable),
-        'd' => decode_dictionary(iterable),
-        _ => decode_from_iter(&mut iterable)
-    }
-}
-
-pub fn decode_from_iter(iterator: &mut Peekable<Chars>) -> DecodedElement {
-    match iterator.peek().expect("Should never panic") {
-        'i' => decode_int(iterator),
-        _ => decode_string(iterator),
+        'l' => decode_list(iterable).0,
+        'd' => decode_dictionary(iterable).0,
+        'i' => decode_int(&mut iterable),
+        _ => decode_string(&mut iterable),
     }
 }
 
@@ -40,6 +33,8 @@ pub fn decode_int(encoded: &mut Peekable<Chars>) -> DecodedElement {
 
 // TODO: throw error when the string size doesn't match the actual size of the string.
 pub fn decode_string(encoded: &mut Peekable<Chars>) -> DecodedElement {
+    println!("{:?}", encoded);
+
     let size: String = encoded
         .take_while(|char| char.is_digit(10))
         .collect();
@@ -50,34 +45,59 @@ pub fn decode_string(encoded: &mut Peekable<Chars>) -> DecodedElement {
     DecodedElement::String(string)
 }
 
-// TODO: Improve error handling
-pub fn decode_list(mut encoded: Peekable<Chars>) -> DecodedElement {
+pub fn decode_list(mut encoded: Peekable<Chars>) -> (DecodedElement, Peekable<Chars>) {
+    encoded.next().expect("Should not panic.");
     let mut decoded_list: Vec<DecodedElement> = Vec::new();
-    encoded.next().expect("should not panic");
 
-    while *encoded.peek().expect("List missing an end marker") != 'e' {
-        let element = decode_from_iter(&mut encoded);
+    while *encoded.peek().expect("Missing list end marker") != 'e' {
+        let element = match encoded.peek().expect("Should not panic") {
+            'l' => {
+                let output = decode_list(encoded);
+                encoded = output.1;
+                output.0
+            },
+            'd' => {
+                let output = decode_list(encoded);
+                encoded = output.1;
+                output.0
+            },
+            'i' => decode_int(&mut encoded),
+            _ => decode_string(&mut encoded),
+        };
+
         decoded_list.push(element);
-    };
-    DecodedElement::List(decoded_list)
+    }
+
+    (DecodedElement::List(decoded_list), encoded)
 }
 
-pub fn decode_dictionary(mut encoded: Peekable<Chars>) -> DecodedElement {
-    let mut decoded_dict: HashMap<String, String> = HashMap::new();
-    encoded.next().expect("should not panic");
+pub fn decode_dictionary(mut encoded: Peekable<Chars>) -> (DecodedElement, Peekable<Chars>) {
+    encoded.next().expect("Should not panic.");
+    let mut decoded_dict: HashMap<String, DecodedElement> = HashMap::new();
 
-    while *encoded.peek().expect("List missing an end marker") != 'e' {
-        let key = get_dict_item(decode_from_iter(&mut encoded));
-        let value = get_dict_item(decode_from_iter(&mut encoded));
+    while *encoded.peek().expect("Missing dict end marker") != 'e' {
+        let key = match decode_string(&mut encoded) {
+            DecodedElement::String(value) => value,
+            _ => panic!("Invalid key"),
+        };
+
+        let value = match encoded.peek().expect("Should not panic") {
+            'l' => {
+                let output = decode_list(encoded);
+                encoded = output.1;
+                output.0
+            },
+            'd' => {
+                let output = decode_list(encoded);
+                encoded = output.1;
+                output.0
+            },
+            'i' => decode_int(&mut encoded),
+            _ => decode_string(&mut encoded),
+        };
 
         decoded_dict.insert(key, value);
     }
-    DecodedElement::Dictionary(decoded_dict)
-}
 
-fn get_dict_item(element: DecodedElement) -> String {
-    match element {
-        DecodedElement::String(value) => value,
-        _ => panic!("Invalid dict item: Dictionary should only contain strings."),
-    }
+    (DecodedElement::Dictionary(decoded_dict), encoded)
 }
